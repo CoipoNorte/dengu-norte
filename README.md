@@ -1,2 +1,3 @@
-# Proyecto Coipo Norte 🐾✨
-Este proyecto nace desde Lubuntu para compartir cultura, creatividad y servicios con el norte.
+# Dengu Norte 🐾✨
+
+Aprendiendo a usar el lubuntu gente
