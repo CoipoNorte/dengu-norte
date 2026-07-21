@@ -1,117 +1,129 @@
-const DB_NAME = 'dengu-norte-db';
+// ==========================================
+// IndexedDB Service - Dengu Norte ATS Optimizer
+// All data persists locally in the browser
+// ==========================================
+
+import { openDB, type IDBPDatabase } from 'idb';
+import type { CVDocument, ATSAnalysis, JobComparison, OptimizedCV } from '../types';
+
+const DB_NAME = 'dengu-norte-ats';
 const DB_VERSION = 1;
-const CV_STORE = 'cvs';
-const ANALYSIS_STORE = 'analyses';
 
-let db: IDBDatabase | null = null;
+// Store names
+const STORES = {
+  CVS: 'cvs',
+  ANALYSES: 'analyses',
+  COMPARISONS: 'comparisons',
+  OPTIMIZED: 'optimized',
+} as const;
 
-export const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    if (db) {
-      resolve(db);
-      return;
-    }
+let dbPromise: Promise<IDBPDatabase> | null = null;
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+function getDB(): Promise<IDBPDatabase> {
+  if (!dbPromise) {
+    dbPromise = openDB(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        // CVs store
+        if (!db.objectStoreNames.contains(STORES.CVS)) {
+          db.createObjectStore(STORES.CVS, { keyPath: 'id' });
+        }
+        // Analyses store
+        if (!db.objectStoreNames.contains(STORES.ANALYSES)) {
+          const store = db.createObjectStore(STORES.ANALYSES, { keyPath: 'id' });
+          store.createIndex('byCvId', 'cvId');
+        }
+        // Comparisons store
+        if (!db.objectStoreNames.contains(STORES.COMPARISONS)) {
+          const store = db.createObjectStore(STORES.COMPARISONS, { keyPath: 'id' });
+          store.createIndex('byCvId', 'cvId');
+        }
+        // Optimized CVs store
+        if (!db.objectStoreNames.contains(STORES.OPTIMIZED)) {
+          const store = db.createObjectStore(STORES.OPTIMIZED, { keyPath: 'id' });
+          store.createIndex('byCvId', 'originalCvId');
+        }
+      },
+    });
+  }
+  return dbPromise;
+}
 
-    request.onerror = () => reject(request.error);
-    
-    request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
-    };
+// ========== CV Operations ==========
 
-    request.onupgradeneeded = (event) => {
-      const database = (event.target as IDBOpenDBRequest).result;
+export async function saveCVDocument(cv: CVDocument): Promise<void> {
+  const db = await getDB();
+  await db.put(STORES.CVS, cv);
+}
 
-      // Store de CVs
-      if (!database.objectStoreNames.contains(CV_STORE)) {
-        const cvStore = database.createObjectStore(CV_STORE, { keyPath: 'id' });
-        cvStore.createIndex('uploadedAt', 'uploadedAt', { unique: false });
-      }
+export async function getAllCVs(): Promise<CVDocument[]> {
+  const db = await getDB();
+  return db.getAll(STORES.CVS);
+}
 
-      // Store de análisis
-      if (!database.objectStoreNames.contains(ANALYSIS_STORE)) {
-        const analysisStore = database.createObjectStore(ANALYSIS_STORE, { keyPath: 'id' });
-        analysisStore.createIndex('cvId', 'cvId', { unique: false });
-      }
-    };
-  });
-};
+export async function getCVById(id: string): Promise<CVDocument | undefined> {
+  const db = await getDB();
+  return db.get(STORES.CVS, id);
+}
 
-export const saveCV = async (cv: any): Promise<string> => {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([CV_STORE], 'readwrite');
-    const store = transaction.objectStore(CV_STORE);
-    const request = store.put(cv);
+export async function deleteCVDocument(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete(STORES.CVS, id);
+  // Also clean up related analyses, comparisons, optimized
+  const analyses = await db.getAllFromIndex(STORES.ANALYSES, 'byCvId', id);
+  for (const a of analyses) await db.delete(STORES.ANALYSES, a.id);
+  const comparisons = await db.getAllFromIndex(STORES.COMPARISONS, 'byCvId', id);
+  for (const c of comparisons) await db.delete(STORES.COMPARISONS, c.id);
+  const optimized = await db.getAllFromIndex(STORES.OPTIMIZED, 'byCvId', id);
+  for (const o of optimized) await db.delete(STORES.OPTIMIZED, o.id);
+}
 
-    request.onsuccess = () => resolve(cv.id);
-    request.onerror = () => reject(request.error);
-  });
-};
+// ========== Analysis Operations ==========
 
-export const getAllCVs = async (): Promise<any[]> => {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([CV_STORE], 'readonly');
-    const store = transaction.objectStore(CV_STORE);
-    const request = store.getAll();
+export async function saveAnalysis(analysis: ATSAnalysis): Promise<void> {
+  const db = await getDB();
+  await db.put(STORES.ANALYSES, analysis);
+}
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
+export async function getAnalysesByCv(cvId: string): Promise<ATSAnalysis[]> {
+  const db = await getDB();
+  return db.getAllFromIndex(STORES.ANALYSES, 'byCvId', cvId);
+}
 
-export const deleteCV = async (id: string): Promise<void> => {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([CV_STORE], 'readwrite');
-    const store = transaction.objectStore(CV_STORE);
-    const request = store.delete(id);
+export async function getAllAnalyses(): Promise<ATSAnalysis[]> {
+  const db = await getDB();
+  return db.getAll(STORES.ANALYSES);
+}
 
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-};
+// ========== Comparison Operations ==========
 
-export const saveAnalysis = async (analysis: any): Promise<string> => {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([ANALYSIS_STORE], 'readwrite');
-    const store = transaction.objectStore(ANALYSIS_STORE);
-    const request = store.put(analysis);
+export async function saveComparison(comparison: JobComparison): Promise<void> {
+  const db = await getDB();
+  await db.put(STORES.COMPARISONS, comparison);
+}
 
-    request.onsuccess = () => resolve(analysis.id);
-    request.onerror = () => reject(request.error);
-  });
-};
+export async function getComparisonsByCv(cvId: string): Promise<JobComparison[]> {
+  const db = await getDB();
+  return db.getAllFromIndex(STORES.COMPARISONS, 'byCvId', cvId);
+}
 
-export const getAnalysesByCV = async (cvId: string): Promise<any[]> => {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([ANALYSIS_STORE], 'readonly');
-    const store = transaction.objectStore(ANALYSIS_STORE);
-    const index = store.index('cvId');
-    const request = index.getAll(cvId);
+export async function getAllComparisons(): Promise<JobComparison[]> {
+  const db = await getDB();
+  return db.getAll(STORES.COMPARISONS);
+}
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
+// ========== Optimized CV Operations ==========
 
-export const clearAllData = async (): Promise<void> => {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([CV_STORE, ANALYSIS_STORE], 'readwrite');
-    
-    const cvStore = transaction.objectStore(CV_STORE);
-    const analysisStore = transaction.objectStore(ANALYSIS_STORE);
+export async function saveOptimizedCV(optimized: OptimizedCV): Promise<void> {
+  const db = await getDB();
+  await db.put(STORES.OPTIMIZED, optimized);
+}
 
-    cvStore.clear();
-    analysisStore.clear();
+export async function getOptimizedByCv(cvId: string): Promise<OptimizedCV[]> {
+  const db = await getDB();
+  return db.getAllFromIndex(STORES.OPTIMIZED, 'byCvId', cvId);
+}
 
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
+export async function getAllOptimized(): Promise<OptimizedCV[]> {
+  const db = await getDB();
+  return db.getAll(STORES.OPTIMIZED);
+}
