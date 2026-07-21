@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
 import { 
   Upload, Target, FileText, Edit3, Search, BarChart3, Users, 
-  Trash2, Award, Loader2 
+  Trash2, Award, Loader2, Save, ArrowLeft 
 } from 'lucide-react'
 import { Toaster, toast } from 'sonner'
 import { 
   saveCV, getAllCVs, deleteCV, clearAllData, 
   saveAnalysis, getAnalysesByCV 
 } from './services/indexedDB'
-import type { CV } from './types'
+import { CV } from './types'
 
 type Section = 'upload' | 'compare' | 'generate' | 'editor' | 'search' | 'dashboard' | 'community'
 
@@ -37,6 +37,11 @@ export default function App() {
   const [jobDescription, setJobDescription] = useState('')
   const [matchScore, setMatchScore] = useState<number | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  
+  // Editor state
+  const [selectedCV, setSelectedCV] = useState<CV | null>(null)
+  const [editedName, setEditedName] = useState('')
+  const [editedScore, setEditedScore] = useState(0)
 
   // Cargar CVs desde IndexedDB
   const loadCVs = async () => {
@@ -51,45 +56,35 @@ export default function App() {
     }
   }
 
-  // Guardar CV en IndexedDB
   const handleSaveCV = async (cv: CV) => {
     try {
       await saveCV(cv)
       const updatedCVs = [...cvs, cv]
       setCvs(updatedCVs)
     } catch (error) {
-      console.error('Error saving CV:', error)
       toast.error('Error al guardar el CV')
     }
   }
 
-  // Calcular puntuación ATS simulada
   const calculateATSScore = (fileName: string): number => {
     let score = 65
     const name = fileName.toLowerCase()
-    
     if (name.includes('cv') || name.includes('resume')) score += 10
     if (name.includes('2024') || name.includes('2025')) score += 8
     if (name.length > 15) score += 7
-    
     return Math.min(Math.floor(score + Math.random() * 15), 98)
   }
 
-  // Manejar subida de archivo
   const handleFileUpload = async (file: File) => {
     if (!file) return
 
     const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']
-    const isValid = validTypes.includes(file.type) || 
-                    file.name.endsWith('.pdf') || 
-                    file.name.endsWith('.docx') || 
-                    file.name.endsWith('.doc')
+    const isValid = validTypes.includes(file.type) || file.name.endsWith('.pdf') || file.name.endsWith('.docx') || file.name.endsWith('.doc')
 
     if (!isValid) {
       toast.error('Solo se permiten archivos PDF, DOCX o DOC')
       return
     }
-
     if (file.size > 10 * 1024 * 1024) {
       toast.error('El archivo es demasiado grande (máximo 10MB)')
       return
@@ -107,12 +102,9 @@ export default function App() {
     }
 
     await handleSaveCV(newCV)
-    toast.success(`CV analizado: ${atsScore}% ATS`, {
-      description: file.name
-    })
+    toast.success(`CV analizado: ${atsScore}% ATS`, { description: file.name })
   }
 
-  // Drag and Drop
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(false)
@@ -120,7 +112,6 @@ export default function App() {
     if (file) handleFileUpload(file)
   }
 
-  // Eliminar CV
   const handleDeleteCV = async (id: string) => {
     try {
       await deleteCV(id)
@@ -132,19 +123,18 @@ export default function App() {
     }
   }
 
-  // Limpiar todos los datos
   const handleClearAll = async () => {
     try {
       await clearAllData()
       setCvs([])
       setMatchScore(null)
+      setSelectedCV(null)
       toast.info('Todos los datos han sido eliminados')
     } catch (error) {
       toast.error('Error al eliminar los datos')
     }
   }
 
-  // Análisis de compatibilidad
   const analyzeMatch = async () => {
     if (!jobDescription.trim()) {
       toast.error('Ingresa la descripción de la oferta')
@@ -156,8 +146,6 @@ export default function App() {
     }
 
     setIsAnalyzing(true)
-
-    // Simular análisis
     await new Promise(resolve => setTimeout(resolve, 1200))
 
     const avgScore = cvs.reduce((sum, cv) => sum + (cv.atsScore || 70), 0) / cvs.length
@@ -165,7 +153,6 @@ export default function App() {
 
     setMatchScore(finalScore)
 
-    // Guardar análisis
     try {
       await saveAnalysis({
         id: Date.now().toString(),
@@ -179,9 +166,45 @@ export default function App() {
     }
 
     setIsAnalyzing(false)
-    toast.success(`Compatibilidad: ${finalScore}%`, {
-      description: 'Análisis completado'
-    })
+    toast.success(`Compatibilidad: ${finalScore}%`)
+  }
+
+  // === EDITOR FUNCTIONS ===
+  const openEditor = (cv: CV) => {
+    setSelectedCV(cv)
+    setEditedName(cv.name)
+    setEditedScore(cv.atsScore || 70)
+    setActiveSection('editor')
+  }
+
+  const saveEditedCV = async () => {
+    if (!selectedCV) return
+
+    const updatedCV: CV = {
+      ...selectedCV,
+      name: editedName,
+      atsScore: editedScore
+    }
+
+    try {
+      await saveCV(updatedCV)
+      
+      // Actualizar lista local
+      const updatedList = cvs.map(cv => 
+        cv.id === selectedCV.id ? updatedCV : cv
+      )
+      setCvs(updatedList)
+      
+      setSelectedCV(updatedCV)
+      toast.success('CV actualizado correctamente')
+    } catch (error) {
+      toast.error('Error al guardar los cambios')
+    }
+  }
+
+  const closeEditor = () => {
+    setSelectedCV(null)
+    setActiveSection('upload')
   }
 
   // Cargar datos al montar
@@ -199,16 +222,12 @@ export default function App() {
               <p className="text-2xl text-zinc-400">Analiza el porcentaje de compatibilidad ATS</p>
             </div>
 
-            {/* Zona de subida */}
             <div 
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
               onDragLeave={() => setIsDragging(false)}
               onClick={() => document.getElementById('file-input')?.click()}
-              className={`
-                border-2 border-dashed rounded-3xl p-16 text-center cursor-pointer transition-all
-                ${isDragging ? 'border-white bg-zinc-900' : 'border-zinc-800 hover:border-zinc-700'}
-              `}
+              className={`border-2 border-dashed rounded-3xl p-16 text-center cursor-pointer transition-all ${isDragging ? 'border-white bg-zinc-900' : 'border-zinc-800 hover:border-zinc-700'}`}
             >
               <div className="mx-auto w-20 h-20 bg-zinc-900 rounded-2xl flex items-center justify-center mb-6">
                 <Upload className="w-10 h-10" />
@@ -220,17 +239,10 @@ export default function App() {
                 Seleccionar archivo
               </button>
               
-              <input 
-                id="file-input" 
-                type="file" 
-                className="hidden" 
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} 
-              />
+              <input id="file-input" type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
               <p className="mt-6 text-sm text-zinc-500">100% privado • Almacenado en tu navegador</p>
             </div>
 
-            {/* Lista de CVs */}
             {cvs.length > 0 && (
               <div className="mt-10">
                 <div className="flex justify-between items-center mb-6 px-2">
@@ -238,10 +250,7 @@ export default function App() {
                     <div className="text-2xl font-semibold">Tus CVs</div>
                     <div className="text-sm text-zinc-500">{cvs.length} archivo(s)</div>
                   </div>
-                  <button 
-                    onClick={handleClearAll}
-                    className="text-red-400 hover:text-red-500 flex items-center gap-2 text-sm"
-                  >
+                  <button onClick={handleClearAll} className="text-red-400 hover:text-red-500 flex items-center gap-2 text-sm">
                     <Trash2 className="w-4 h-4" /> Limpiar todo
                   </button>
                 </div>
@@ -260,16 +269,19 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         {cv.atsScore && (
                           <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-sm font-medium flex items-center gap-2">
                             <Award className="w-4 h-4" /> {cv.atsScore}%
                           </div>
                         )}
                         <button 
-                          onClick={() => handleDeleteCV(cv.id)} 
-                          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-500 p-2 transition-all"
+                          onClick={() => openEditor(cv)}
+                          className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm flex items-center gap-2 transition-colors"
                         >
+                          <Edit3 className="w-4 h-4" /> Editar
+                        </button>
+                        <button onClick={() => handleDeleteCV(cv.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-500 p-2 transition-all">
                           <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
@@ -303,13 +315,9 @@ export default function App() {
                 className="mt-6 w-full py-4 bg-white text-black text-xl font-medium rounded-2xl hover:bg-zinc-200 transition-colors flex items-center justify-center gap-3 disabled:opacity-70"
               >
                 {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" /> Analizando...
-                  </>
+                  <><Loader2 className="w-6 h-6 animate-spin" /> Analizando...</>
                 ) : (
-                  <>
-                    <Target className="w-6 h-6" /> Analizar Compatibilidad
-                  </>
+                  <><Target className="w-6 h-6" /> Analizar Compatibilidad</>
                 )}
               </button>
 
@@ -317,10 +325,86 @@ export default function App() {
                 <div className="mt-8 p-8 bg-zinc-950 border border-zinc-700 rounded-3xl text-center">
                   <div className="text-7xl font-bold tracking-tighter mb-2">{matchScore}%</div>
                   <div className="text-xl text-emerald-400">Compatibilidad ATS</div>
-                  <div className="text-sm text-zinc-500 mt-4">Basado en {cvs.length} CV(s)</div>
                 </div>
               )}
             </div>
+          </div>
+        )
+
+      case 'editor':
+        return (
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-center gap-4 mb-8">
+              <button 
+                onClick={closeEditor}
+                className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" /> Volver
+              </button>
+              <div>
+                <h1 className="text-4xl font-bold tracking-tighter">Editor ATS</h1>
+                <p className="text-zinc-400">Optimiza tu CV para sistemas ATS</p>
+              </div>
+            </div>
+
+            {selectedCV && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
+                <div className="space-y-6">
+                  {/* Nombre del archivo */}
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Nombre del archivo</label>
+                    <input 
+                      type="text" 
+                      value={editedName} 
+                      onChange={(e) => setEditedName(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-2xl px-6 py-4 text-lg focus:outline-none focus:border-white"
+                    />
+                  </div>
+
+                  {/* Puntuación ATS */}
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Puntuación ATS</label>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="range" 
+                        min="50" 
+                        max="98" 
+                        value={editedScore} 
+                        onChange={(e) => setEditedScore(parseInt(e.target.value))}
+                        className="flex-1 accent-white"
+                      />
+                      <div className="text-4xl font-bold w-20 text-right">{editedScore}</div>
+                    </div>
+                  </div>
+
+                  {/* Recomendaciones ATS */}
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-3">Recomendaciones ATS</label>
+                    <div className="space-y-3">
+                      <div className="bg-zinc-950 border border-zinc-700 rounded-2xl p-4 text-sm">
+                        ✓ Usa palabras clave de la oferta laboral
+                      </div>
+                      <div className="bg-zinc-950 border border-zinc-700 rounded-2xl p-4 text-sm">
+                        ✓ Evita tablas y columnas complejas
+                      </div>
+                      <div className="bg-zinc-950 border border-zinc-700 rounded-2xl p-4 text-sm">
+                        ✓ Usa fuentes estándar (Arial, Calibri)
+                      </div>
+                      <div className="bg-zinc-950 border border-zinc-700 rounded-2xl p-4 text-sm">
+                        ✓ Incluye sección de habilidades técnicas
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={saveEditedCV}
+                    className="w-full py-4 bg-white text-black text-xl font-medium rounded-2xl hover:bg-zinc-200 transition-colors flex items-center justify-center gap-3"
+                  >
+                    <Save className="w-6 h-6" /> Guardar cambios
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )
 
@@ -375,7 +459,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Navbar */}
       <nav className="border-b border-zinc-800 bg-zinc-950/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -396,7 +479,6 @@ export default function App() {
       </nav>
 
       <div className="flex max-w-7xl mx-auto">
-        {/* Sidebar */}
         <div className="w-80 border-r border-zinc-800 bg-zinc-950 min-h-[calc(100vh-5rem)] p-5 hidden lg:block">
           <div className="px-3 mb-4">
             <div className="text-xs font-semibold tracking-[3px] text-zinc-500 mb-4">HERRAMIENTAS ATS</div>
@@ -407,9 +489,7 @@ export default function App() {
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left transition-all hover:bg-zinc-900 ${
-                  activeSection === item.id ? 'bg-white text-black' : 'hover:text-white'
-                }`}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left transition-all hover:bg-zinc-900 ${activeSection === item.id ? 'bg-white text-black' : 'hover:text-white'}`}
               >
                 <div className="flex-shrink-0">{item.icon}</div>
                 <div className="flex-1 min-w-0">
@@ -421,7 +501,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="flex-1 p-8 lg:p-12">
           {renderSection()}
         </div>
