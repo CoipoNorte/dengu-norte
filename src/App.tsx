@@ -8,7 +8,7 @@ import {
   saveCV, getAllCVs, deleteCV, clearAllData, 
   saveAnalysis 
 } from './services/indexedDB'
-import type { CV } from './types'
+import { CV } from './types'
 
 type Section = 'upload' | 'compare' | 'generate' | 'editor' | 'search' | 'dashboard' | 'community'
 
