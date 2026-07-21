@@ -67,7 +67,7 @@ Dengu Norte es una herramienta **100% cliente** (sin backend) que ayuda a las pe
 
 ## 🚀 Demo
 
-🔗 **[Ver Demo en Vivo](https://tuusuario.github.io/dengu-norte/)**
+🔗 **[Ver Demo en Vivo](https://coiponorte.github.io/dengu-norte/)**
 
 ---
 
@@ -81,7 +81,7 @@ Dengu Norte es una herramienta **100% cliente** (sin backend) que ayuda a las pe
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/tuusuario/dengu-norte.git
+git clone https://github.com/coiponorte/dengu-norte.git
 
 # Entrar al directorio
 cd dengu-norte
@@ -94,108 +94,6 @@ npm run dev
 ```
 
 La aplicación estará disponible en `http://localhost:5173`
-
----
-
-## 📦 Despliegue
-
-### GitHub Pages
-
-```bash
-# Build y deploy a gh-pages
-npm run deploy
-```
-
-Esto ejecutará el build y publicará automáticamente en la rama `gh-pages`.
-
-### Configuración del repositorio
-
-1. Ve a **Settings** > **Pages** en tu repositorio de GitHub
-2. En **Source**, selecciona la rama `gh-pages`
-3. Guarda los cambios
-
-Tu sitio estará disponible en: `https://tuusuario.github.io/dengu-norte/`
-
----
-
-## 🛠️ Tecnologías
-
-| Categoría | Tecnología |
-|-----------|------------|
-| **Frontend** | React 19 + TypeScript |
-| **Build Tool** | Vite |
-| **Estilos** | Tailwind CSS 4 |
-| **Almacenamiento** | IndexedDB (idb) |
-| **Iconos** | Lucide React |
-| **Animaciones** | Framer Motion |
-| **Despliegue** | GitHub Pages |
-
----
-
-## 📁 Estructura del Proyecto
-
-```
-dengu-norte/
-├── public/
-│   └── favicon.png
-├── src/
-│   ├── components/
-│   │   ├── pages/           # Páginas de la aplicación
-│   │   ├── Sidebar.tsx      # Navegación lateral
-│   │   ├── MobileNav.tsx    # Navegación móvil
-│   │   └── ScoreRing.tsx    # Componente de score circular
-│   ├── hooks/
-│   │   └── useDatabase.ts   # Hook de IndexedDB
-│   ├── services/
-│   │   ├── indexedDB.ts     # Operaciones de base de datos
-│   │   └── atsEngine.ts     # Motor de análisis ATS
-│   ├── types/
-│   │   └── index.ts         # Tipos TypeScript
-│   ├── utils/
-│   │   └── cn.ts            # Utilidad de clases
-│   ├── App.tsx
-│   ├── main.tsx
-│   └── index.css
-├── index.html
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-└── README.md
-```
-
----
-
-## 🔒 Privacidad
-
-- ✅ **100% Cliente**: Todo el procesamiento ocurre en tu navegador
-- ✅ **Sin Backend**: No hay servidor que reciba tus datos
-- ✅ **Sin Cuentas**: No requiere registro ni login
-- ✅ **Datos Locales**: Todo se almacena en IndexedDB de tu navegador
-- ✅ **Sin Tracking**: No hay analytics ni cookies de terceros
-
----
-
-## 🤝 Contribuir
-
-Las contribuciones son bienvenidas. Por favor:
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add: AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
----
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
-
----
-
-## 👨‍💻 Autor
-
-Creado con ❤️ para ayudar a más personas a conseguir el trabajo de sus sueños.
 
 ---
 
