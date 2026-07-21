@@ -1,4 +1,4 @@
-# 🧠 Dengu Norte - ATS Optimizer
+# 🧠 [Dengu Norte - ATS Optimizer](https://coiponorte.github.io/dengu-norte/)
 
 <p align="center">
   <img src="public/favicon.png" alt="Dengu Norte Logo" width="120" />
